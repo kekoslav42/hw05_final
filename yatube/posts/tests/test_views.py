@@ -92,14 +92,16 @@ class Test(TestCase):
 
     def test_new_post_not_in_another_group(self):
         """Тест появления поста в прочих группах............................"""
-        Post.objects.create(
+        post = Post.objects.create(
             text='Test test',
             author=self.user,
         )
         response = self.authorized_client.get(reverse(
             'group_posts', kwargs={'slug': self.group.slug})
         ).context.get('page')
-
+        self.assertNotIn(post, response)
+        # А тут получается оставить или нет?
+        # Просто вроде бы больше то проверок и не нужно
         self.assertEqual(response.paginator.object_list.count(), 1)
 
     def test_group_context_in_template(self):
@@ -150,16 +152,26 @@ class Test(TestCase):
         self.post_context_test(post1)
 
     def test_cache(self):
-        response = self.authorized_client.get(reverse('index'))
-        self.assertContains(response, self.post.text)
+        """Тест кэша........................................................"""
+        # Сидел думал. Долго думал, экперементировал. Понравился этот вариант,
+        # Просто не до конца понимаю логику assertIn и assertNotIn.
+        # Пытаюсь разобраться, но пока без успехов.
+        # Не понимаю как фиксить вот это 'NoneType' object is not subscriptable
+        # Мне кажется что приходит пустой page и ему негде искать post.
+        # Исправь если ошибаюсь
+        # Надеюсь реализация через assertEqual тоже подойдет.
+        # Сорри что долго сдаю на второе ревью, только температура спала
+        # и ставил isort с flake как тулзы для pycharm =)
         post = Post.objects.create(
-            text='Test cache',
-            author=self.user
-        )
+            author=self.user,
+            text='CACHE')
+        self.authorized_client.get(reverse('index'))
         response = self.authorized_client.get(reverse('index'))
-
-        self.assertNotContains(response, post.text)
-
+        self.assertEqual(response.context, None)
+        cache.clear()
+        response = self.authorized_client.get(reverse('index'))
+        self.assertNotEqual(response.context, None)
+        self.assertEqual(response.context['page'][0].text, post.text)
 
 
 class PaginatorViewsTest(TestCase):
@@ -227,8 +239,6 @@ class CommentAndFollowTest(TestCase):
 
     def test_auth_user_can_follow(self):
         """Тест авторизованный пользователь может подписаться..............."""
-        # Я не догадался какие ещё проверки
-        # в этих двух тестах можно ещё сделать
         self.client_auth.post(
             reverse('profile_follow', kwargs={'username': self.user2}),
             follow=True
@@ -260,7 +270,6 @@ class CommentAndFollowTest(TestCase):
             data=form,
             follow=True
         )
-        # response = self.client_auth.get(reverse('post', kwargs=url_kwargs))
         comment = Comment.objects.filter(
             author=self.user1,
             post=self.post.id
@@ -306,7 +315,6 @@ class CommentAndFollowTest(TestCase):
 
     def test_not_follow_post_dont_appears_in_follow_index(self):
         """Тест того что пост не появился не у подписчика..................."""
-        # Не нашёл ничего умнее как сравнить сколько данный в пагинаторе с 0
         Post.objects.create(
             text='example',
             author=self.user2

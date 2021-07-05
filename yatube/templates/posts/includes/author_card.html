@@ -20,7 +20,7 @@
           Записей: {{ author.posts.count }}
         </div>
       </li>
-      {% if request.user != post.author %}
+      {% if request.user != author %}
       <li class="list-group-item">
         {% if following %}
           <a class="btn btn-lg btn-light"

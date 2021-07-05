@@ -90,7 +90,6 @@ class TestUrls(TestCase):
         response = self.client_author.get(url)
         self.assertTemplateUsed(response, 'posts/new_post.html')
 
-    # По логике это должно находиться здесь
     def test_404_page_not_found(self):
         """Тест 404 страницы ошибки........................................."""
         response = self.guest_client.get('/404/')

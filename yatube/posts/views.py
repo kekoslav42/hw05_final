@@ -141,12 +141,11 @@ def profile_follow(request, username):
 
 @login_required
 def profile_unfollow(request, username):
-    author = get_object_or_404(User, username=username)
-    follow = Follow.objects.get(
-        author=author, user=request.user
-    )
-    if Follow.objects.filter(pk=follow.pk).exists():
-        follow.delete()
+    # Я реализовал немного другую логику, отличную от прошлого ревью,
+    # работает и выглядит лучше. На деле не знаю. И тут все так же get
+    following = get_object_or_404(User, username=username)
+    if request.user != following:
+        Follow.objects.filter(user=request.user, author=following).delete()
     return redirect('profile', username=username)
 
 
