@@ -40,8 +40,9 @@ def profile(request, username):
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
     user = request.user
-    following = Follow.objects.filter(user__username=user,
-                                      author=author).count()
+    following = Follow.objects.filter(
+        user__username=user, author=author
+    )
     return render(
         request,
         'posts/profile.html',
@@ -88,7 +89,6 @@ def edit_post(request, username, post_id):
         request.POST or None, files=request.FILES or None, instance=post
     )
     if request.user.username == username:
-        # В контексте пришлось передать ещё post иначе валило тесты
         if not form.is_valid():
             return render(
                 request,
@@ -100,10 +100,6 @@ def edit_post(request, username, post_id):
     return redirect('post', username=username, post_id=post_id)
 
 
-# Спринт какой то более менее, нового материала мало,
-# а вот в тестах я вообще не уверен, а тут более менее кажется нормально,
-# лучший костыль что я делал =)
-# Следовал по тз, если что-то пропустил можешь ругать =(
 @login_required
 def add_comment(request, username, post_id):
     post = get_object_or_404(Post, id=post_id, author__username=username)
@@ -146,8 +142,9 @@ def profile_follow(request, username):
 @login_required
 def profile_unfollow(request, username):
     author = get_object_or_404(User, username=username)
-    follow = Follow.objects.get(author=author,
-                                user=request.user)
+    follow = Follow.objects.get(
+        author=author, user=request.user
+    )
     if Follow.objects.filter(pk=follow.pk).exists():
         follow.delete()
     return redirect('profile', username=username)

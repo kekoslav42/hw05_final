@@ -52,6 +52,7 @@ class Test(TestCase):
         }
 
     def setUp(self):
+        cache.clear()
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
 
@@ -61,10 +62,6 @@ class Test(TestCase):
         super().tearDownClass()
 
     def post_context_test(self, post):
-        # очень не уверен что работает с пикчей,
-        # он не разу ошибки не выдал, но при тестах которые делал для себя
-        # если сравнивать пустые поля, то он крашил, значит возможно работает.
-        # я помечаю неуверенные моменты. надеюсь это тебе ничего не усложнит
         self.assertEqual(post.author, self.post.author)
         self.assertEqual(post.text, self.post.text)
         self.assertEqual(post.group, self.post.group)
@@ -73,16 +70,12 @@ class Test(TestCase):
 
     def test_pages_use_current_template(self):
         """Тест использования корректрого шаблона при обращение через name.."""
-        # Вот тут я наверное напортачил писав везде cache.clean(),
-        # может декораторы класса есть какие нибудь
-        cache.clear()
         for template, reverse_name in self.temp_page_named.items():
             with self.subTest(reverse_name=reverse_name):
                 response = self.authorized_client.get(reverse_name)
                 self.assertTemplateUsed(response, template)
 
     def test_index_context_in_template(self):
-        cache.clear()
         """Тест контекста index............................................."""
         response = self.authorized_client.get(reverse('index'))
         post1 = response.context['page'][0]
@@ -90,7 +83,6 @@ class Test(TestCase):
 
     def test_new_post_visible_in__group(self):
         """Тест видимости нового поста в группе............................."""
-        cache.clear()
         response = self.authorized_client.get(reverse(
             'group_posts', kwargs={'slug': self.group.slug})
         )
@@ -107,12 +99,11 @@ class Test(TestCase):
         response = self.authorized_client.get(reverse(
             'group_posts', kwargs={'slug': self.group.slug})
         ).context.get('page')
-        # Вот так же надо было? =)
+
         self.assertEqual(response.paginator.object_list.count(), 1)
 
     def test_group_context_in_template(self):
         """Тест контекста group............................................."""
-        cache.clear()
         response = self.authorized_client.get(reverse(
             'group_posts', kwargs={'slug': self.group.slug})
         )
@@ -159,7 +150,6 @@ class Test(TestCase):
         self.post_context_test(post1)
 
     def test_cache(self):
-        cache.clear()
         response = self.authorized_client.get(reverse('index'))
         self.assertContains(response, self.post.text)
         post = Post.objects.create(
@@ -167,7 +157,9 @@ class Test(TestCase):
             author=self.user
         )
         response = self.authorized_client.get(reverse('index'))
+
         self.assertNotContains(response, post.text)
+
 
 
 class PaginatorViewsTest(TestCase):
@@ -194,9 +186,11 @@ class PaginatorViewsTest(TestCase):
             reverse('profile', kwargs={'username': cls.user.username})
         ]
 
+    def setUp(self):
+        cache.clear()
+
     def test_first_page_contains_ten_records(self):
         """Тест 1-ой страницы паджинатора на то что приходит 10 постов......"""
-        cache.clear()
         for adress in self.sub_test_url:
             with self.subTest(adress=adress):
                 response = self.client.get(adress).context.get('page')
@@ -214,7 +208,6 @@ class PaginatorViewsTest(TestCase):
 
 
 class CommentAndFollowTest(TestCase):
-    # Создал класс чтобы не засрать основные тесты
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -261,9 +254,10 @@ class CommentAndFollowTest(TestCase):
     def test_auth_user_can_comment_post(self):
         """Тест того что пользователь может оставить коммент................"""
         url_kwargs = {'username': self.user1, 'post_id': self.post.id}
+        form = {'text': 'TEST_TEXT'}
         response_status_test = self.client_auth.post(
             reverse('add_comment', kwargs=url_kwargs),
-            data={'text': 'TEST_TEXT'},
+            data=form,
             follow=True
         )
         # response = self.client_auth.get(reverse('post', kwargs=url_kwargs))
@@ -272,9 +266,7 @@ class CommentAndFollowTest(TestCase):
             post=self.post.id
         ).count()
         self.assertEqual(response_status_test.status_code, HTTPStatus.OK)
-        # self.assertEqual(response.context['comments'][0], form['text'])
-        # Я или тупой или да, но у меня ничего не получилось, выходило только
-        # <Comment: Comment object (1)> != 'TEST_TEXT'
+        self.assertTrue(Comment.objects.filter(text=form['text']).exists())
         self.assertEqual(comment, 1)
 
     def test_guest_user_cant_comment_post(self):
@@ -282,14 +274,12 @@ class CommentAndFollowTest(TestCase):
         url_kwarg = {'username': self.user1, 'post_id': self.post.id}
         response = self.client_guest.post(
             reverse('add_comment', kwargs=url_kwarg),
-            data={'text': 'TEST_TEXT'}
+            data={'text': 'TEST_TEXT'},
+            follow=True
         )
         login_url = reverse('login')
         new_comment_url = reverse('add_comment', kwargs=url_kwarg)
         login_redirects = f'{login_url}?next={new_comment_url}'
-        # Открыв метод через ctrl
-        # увидел что можно без follow=True указать статус код,
-        # а может не правильно понял=)
         self.assertRedirects(
             response, login_redirects, target_status_code=HTTPStatus.OK
         )
@@ -309,9 +299,6 @@ class CommentAndFollowTest(TestCase):
         )
         response = self.client_auth.get(reverse('follow_index'))
         post_context = response.context['page'][0]
-        # Тут количество постов в пагинаторе зачем то сравниваю =)
-        self.assertEqual(
-            response.context.get('page').paginator.object_list.count(), 1)
         self.assertEqual(post_context.author, post.author)
         self.assertEqual(post_context.text, post.text)
         self.assertEqual(post_context.group, post.group)
