@@ -3,7 +3,6 @@ from django import forms
 from .models import Comment, Post
 
 
-# Добавил labels, вроде как почитал полезно
 class PostForm(forms.ModelForm):
     class Meta:
         model = Post

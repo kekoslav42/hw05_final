@@ -19,8 +19,6 @@ class GroupAdmin(admin.ModelAdmin):
     empty_value_display = '-пусто-'
 
 
-# Вроде как можно было не добавлять,
-# но я добавил, не должно мешать ничем
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
     list_display = ('text', 'post', 'author', 'created')
