@@ -26,6 +26,13 @@
       </h5>
       <p>{{ item.text|linebreaksbr }}</p>
       <p>{{ item.created }}</p>
+      {% if user == item.author  or user == post.author%}
+          <a class="btn btn-danger"
+             href="{% url 'delete_comment' comment_id=item.id %}"
+             role="button">
+            Удалить комментарий
+          </a>
+      {% endif %}
     </div>
   </div>
 {% endfor %}

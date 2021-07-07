@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import cache_page
 
 from .forms import CommentForm, PostForm
-from .models import Follow, Group, Post, User
+from .models import Comment, Follow, Group, Post, User
 
 
 @cache_page(15, key_prefix='index_page')
@@ -42,7 +42,8 @@ def profile(request, username):
     user = request.user
     following = Follow.objects.filter(
         user__username=user, author=author
-    )
+    ).exists() if user.is_authenticated else False
+
     return render(
         request,
         'posts/profile.html',
@@ -57,12 +58,20 @@ def post_view(request, username, post_id):
     )
     form = CommentForm()
     comments = post.comments.all()
+    # Заметил очень поздно баг,
+    # и там получается на странице поста предлагало подписаться
+    # в общем косяк ибо в шаблон поста то не передавалось Following
+    following = Follow.objects.filter(
+        user__username=request.user,
+        author=post.author
+    ).exists() if request.user.is_authenticated else False
     return render(
         request,
         'posts/post.html',
         {'post': post,
          'form': form,
-         'comments': comments}
+         'comments': comments,
+         'following': following}
     )
 
 
@@ -80,6 +89,19 @@ def new_post(request):
     post.author = request.user
     post.save()
     return redirect('index')
+
+
+# Это я для себя уже больше, можешь даже не смотреть =)
+# Это же уже не входит в обучение
+def delete_post(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    if request.user == post.author:
+        post.delete()
+    return redirect('index')
+    # баг пофиксить до 11.07
+    # Дабл клик выходит в 404
+    # Комменты так же...
+    # Использую я то or 404 значит ли что это баг.
 
 
 @login_required
@@ -118,6 +140,19 @@ def add_comment(request, username, post_id):
     return redirect('post', username=username, post_id=post_id)
 
 
+# Тоже для себя
+def delete_comment(request, comment_id):
+    comment = get_object_or_404(Comment, id=comment_id)
+    # Проверка что пользователь автор коммента или автор поста
+    if request.user == comment.author or request.user == comment.post.author:
+        comment.delete()
+    return redirect(
+        'post',
+        username=comment.post.author,
+        post_id=comment.post.pk
+    )
+
+
 @login_required
 def follow_index(request):
     post_list = Post.objects.filter(author__following__user=request.user)
@@ -141,11 +176,11 @@ def profile_follow(request, username):
 
 @login_required
 def profile_unfollow(request, username):
-    # Я реализовал немного другую логику, отличную от прошлого ревью,
-    # работает и выглядит лучше. На деле не знаю. И тут все так же get
-    following = get_object_or_404(User, username=username)
-    if request.user != following:
-        Follow.objects.filter(user=request.user, author=following).delete()
+    # Никогда бы не подумал что так можно
+    Follow.objects.filter(
+        user=request.user,
+        author__username=username
+    ).delete()
     return redirect('profile', username=username)
 
 

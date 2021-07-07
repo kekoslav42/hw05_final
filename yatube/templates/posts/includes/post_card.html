@@ -38,6 +38,11 @@
              role="button">
             Редактировать
           </a>
+          <a class="btn btn-sm btn-danger"
+             href="{% url 'delete_post' post_id=post.id %}"
+             role="button">
+            Удалить запись
+          </a>
         {% endif %}
       </div>
 

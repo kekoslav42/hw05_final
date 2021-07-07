@@ -100,9 +100,6 @@ class Test(TestCase):
             'group_posts', kwargs={'slug': self.group.slug})
         ).context.get('page')
         self.assertNotIn(post, response)
-        # А тут получается оставить или нет?
-        # Просто вроде бы больше то проверок и не нужно
-        self.assertEqual(response.paginator.object_list.count(), 1)
 
     def test_group_context_in_template(self):
         """Тест контекста group............................................."""
@@ -153,25 +150,21 @@ class Test(TestCase):
 
     def test_cache(self):
         """Тест кэша........................................................"""
-        # Сидел думал. Долго думал, экперементировал. Понравился этот вариант,
-        # Просто не до конца понимаю логику assertIn и assertNotIn.
-        # Пытаюсь разобраться, но пока без успехов.
-        # Не понимаю как фиксить вот это 'NoneType' object is not subscriptable
-        # Мне кажется что приходит пустой page и ему негде искать post.
-        # Исправь если ошибаюсь
-        # Надеюсь реализация через assertEqual тоже подойдет.
-        # Сорри что долго сдаю на второе ревью, только температура спала
-        # и ставил isort с flake как тулзы для pycharm =)
-        post = Post.objects.create(
-            author=self.user,
-            text='CACHE')
+        # Первый вызов для проверки
         self.authorized_client.get(reverse('index'))
         response = self.authorized_client.get(reverse('index'))
         self.assertEqual(response.context, None)
+        post = Post.objects.create(
+            author=self.user,
+            text='CACHE')
+        # Вызов для проверки после создания поста
+        response = self.authorized_client.get(reverse('index'))
+        self.assertEqual(response.context, None)
         cache.clear()
+        # Вызов для проверки после очистки кэша
         response = self.authorized_client.get(reverse('index'))
         self.assertNotEqual(response.context, None)
-        self.assertEqual(response.context['page'][0].text, post.text)
+        self.assertEqual(response.context['page'][0], post)
 
 
 class PaginatorViewsTest(TestCase):
@@ -270,13 +263,17 @@ class CommentAndFollowTest(TestCase):
             data=form,
             follow=True
         )
-        comment = Comment.objects.filter(
+        comments_count = Comment.objects.filter(
             author=self.user1,
             post=self.post.id
         ).count()
         self.assertEqual(response_status_test.status_code, HTTPStatus.OK)
-        self.assertTrue(Comment.objects.filter(text=form['text']).exists())
-        self.assertEqual(comment, 1)
+        self.assertTrue(Comment.objects.filter(
+            text=form['text'],
+            post=self.post,
+            author=self.user1
+        ).exists())
+        self.assertEqual(comments_count, 1)
 
     def test_guest_user_cant_comment_post(self):
         """Тест что неавторизованный пользователь редиректит на логин......."""
@@ -293,9 +290,9 @@ class CommentAndFollowTest(TestCase):
             response, login_redirects, target_status_code=HTTPStatus.OK
         )
 
-        comment = Comment.objects.filter(
+        comments_count = Comment.objects.filter(
             author=self.user1, post=self.post.id).count()
-        self.assertEqual(comment, 0)
+        self.assertEqual(comments_count, 0)
 
     def test_new_post_appears_in_follow_index(self):
         """Тест того что пост появился в списке у подписки.................."""
@@ -307,11 +304,7 @@ class CommentAndFollowTest(TestCase):
             user=self.user1, author=self.user2
         )
         response = self.client_auth.get(reverse('follow_index'))
-        post_context = response.context['page'][0]
-        self.assertEqual(post_context.author, post.author)
-        self.assertEqual(post_context.text, post.text)
-        self.assertEqual(post_context.group, post.group)
-        self.assertEqual(post_context.pub_date, post.pub_date)
+        self.assertIn(post, response.context['page'])
 
     def test_not_follow_post_dont_appears_in_follow_index(self):
         """Тест того что пост не появился не у подписчика..................."""
