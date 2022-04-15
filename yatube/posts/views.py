@@ -58,9 +58,6 @@ def post_view(request, username, post_id):
     )
     form = CommentForm()
     comments = post.comments.all()
-    # Заметил очень поздно баг,
-    # и там получается на странице поста предлагало подписаться
-    # в общем косяк ибо в шаблон поста то не передавалось Following
     following = Follow.objects.filter(
         user__username=request.user,
         author=post.author
@@ -91,17 +88,11 @@ def new_post(request):
     return redirect('index')
 
 
-# Это я для себя уже больше, можешь даже не смотреть =)
-# Это же уже не входит в обучение
 def delete_post(request, post_id):
     post = get_object_or_404(Post, id=post_id)
     if request.user == post.author:
         post.delete()
     return redirect('index')
-    # баг пофиксить до 11.07
-    # Дабл клик выходит в 404
-    # Комменты так же...
-    # Использую я то or 404 значит ли что это баг.
 
 
 @login_required
@@ -140,10 +131,9 @@ def add_comment(request, username, post_id):
     return redirect('post', username=username, post_id=post_id)
 
 
-# Тоже для себя
+
 def delete_comment(request, comment_id):
     comment = get_object_or_404(Comment, id=comment_id)
-    # Проверка что пользователь автор коммента или автор поста
     if request.user == comment.author or request.user == comment.post.author:
         comment.delete()
     return redirect(
@@ -176,7 +166,6 @@ def profile_follow(request, username):
 
 @login_required
 def profile_unfollow(request, username):
-    # Никогда бы не подумал что так можно
     Follow.objects.filter(
         user=request.user,
         author__username=username
